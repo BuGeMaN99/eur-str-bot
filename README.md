@@ -36,9 +36,9 @@ Per tenere l'applicazione in esecuzione 24/7 nel tuo container LXC (Linux Contai
 
 Questa guida ti presume loggato nel tuo LXC come root:
 
-1. Assicurati di avere il progetto in una directory stabile, es. `/opt/eur-str-bot/`
+1. Assicurati di avere il progetto in una directory stabile, es. `/opt/bots/eur-str-bot/`
    ```bash
-   cd /opt/
+   cd /opt/bots/
    # ... (clona il progetto, crea l'ambiente venv, etc.)
    ```
 
@@ -47,7 +47,7 @@ Questa guida ti presume loggato nel tuo LXC come root:
    nano /etc/systemd/system/eur-str-bot.service
    ```
 
-3. Incolla la seguente configurazione (aggiusta i percorsi `/opt/eur-str-bot` in base a dove hai messo la cartella):
+3. Incolla la seguente configurazione (aggiusta i percorsi `/opt/bots/eur-str-bot` in base a dove hai messo la cartella):
    ```ini
    [Unit]
    Description=EUR/ESTR Web App
@@ -56,11 +56,11 @@ Questa guida ti presume loggato nel tuo LXC come root:
    [Service]
    Type=simple
    User=root
-   WorkingDirectory=/opt/eur-str-bot
+   WorkingDirectory=/opt/bots/eur-str-bot
    # Puoi configurare la porta della UI specificando la variabile d'ambiente PORT (es: 80)
    Environment="PORT=8345"
    # Usa l'eseguibile Python dal virtual environment che hai creato!
-   ExecStart=/opt/eur-str-bot/venv/bin/python /opt/eur-str-bot/app.py
+   ExecStart=/opt/bots/eur-str-bot/venv/bin/python /opt/bots/eur-str-bot/app.py
    Restart=always
    RestartSec=10
 
