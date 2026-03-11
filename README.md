@@ -41,10 +41,14 @@ Per tenere l'applicazione in esecuzione 24/7 nel tuo container LXC (Linux Contai
 
 Questa guida ti presume loggato nel tuo LXC come root:
 
-1. Assicurati di avere il progetto in una directory stabile, es. `/opt/bots/eur-str-bot/`
+1. **Installa il progetto** in una directory stabile (es. `/opt/bots/`):
    ```bash
    cd /opt/bots/
-   # ... (clona il progetto, crea l'ambiente venv, etc.)
+   git clone https://github.com/andreabugetti/eur-str-bot.git
+   cd eur-str-bot
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
    ```
 
 2. Crea un file di servizio col comando:
