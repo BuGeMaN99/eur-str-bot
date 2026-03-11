@@ -1,12 +1,10 @@
-# Telegram Euribor / €STR Bot 🤖
+# Web App Statistiche Euribor / €STR 📊
 
-Questo bot recupera giornalmente (alle 08:01) il tasso **€STR (Euro short-term rate)** dal sito web ufficiale della **BCE (Banca Centrale Europea)**, lo incrementa di 8,5 punti base e invia un messaggio formattato in un canale Telegram o chat specifica.
+Questa applicazione web recupera in tempo reale il tasso **€STR (Euro short-term rate)** dal sito web ufficiale della **BCE (Banca Centrale Europea)**, lo incrementa di 8,5 punti base e mostra i risultati su una pagina web dedicata ed esposta tramite porta.
 
 ## 🚀 Requisiti
 
 - Python 3.8+
-- Token di un bot Telegram (ottenibile tramite [@BotFather](https://t.me/BotFather))
-- ID del Canale o Chat Telegram (es. `@strvalue` o ID numerico)
 
 ## ⚙️ Installazione e Configurazione Rapida (Sviluppo)
 
@@ -23,22 +21,18 @@ Questo bot recupera giornalmente (alle 08:01) il tasso **€STR (Euro short-term
    pip install -r requirements.txt
    ```
 
-3. **Crea e configura il file `.env`**:
-   ```bash
-   cp .env.example .env
-   ```
-   Apri il file `.env` inserendo i tuoi dati (il token e l'ID del canale).
-
-4. **Avvia il bot**:
+3. **Avvia il server**:
    ```bash
    python3 tassi_bot.py
    ```
-
----
+   L'applicazione di default sarà esposta sulla porta `8345`. Puoi specificare una porta diversa passando la variabile d'ambiente `PORT`:
+   ```bash
+   PORT=8080 python3 tassi_bot.py
+   ```
 
 ## 🛠️ Suggerimenti per il Deployment su LXC (Proxmox / Linux)
 
-Per tenere il bot in esecuzione 24/7 nel tuo container LXC (Linux Containers), la soluzione più affidabile è un servizio `systemd`.
+Per tenere l'applicazione in esecuzione 24/7 nel tuo container LXC (Linux Containers), la soluzione più affidabile è un servizio `systemd`.
 
 Questa guida ti presume loggato nel tuo LXC come root:
 
@@ -56,13 +50,15 @@ Questa guida ti presume loggato nel tuo LXC come root:
 3. Incolla la seguente configurazione (aggiusta i percorsi `/opt/eur-str-bot` in base a dove hai messo la cartella):
    ```ini
    [Unit]
-   Description=Telegram Euribor/ESTR Bot
+   Description=EUR/ESTR Web App
    After=network.target
 
    [Service]
    Type=simple
    User=root
    WorkingDirectory=/opt/eur-str-bot
+   # Puoi configurare la porta della UI specificando la variabile d'ambiente PORT (es: 80)
+   Environment="PORT=8345"
    # Usa l'eseguibile Python dal virtual environment che hai creato!
    ExecStart=/opt/eur-str-bot/venv/bin/python /opt/eur-str-bot/tassi_bot.py
    Restart=always
@@ -83,8 +79,3 @@ Questa guida ti presume loggato nel tuo LXC come root:
    ```bash
    journalctl -u eur-str-bot.service -f
    ```
-
-## 📋 Comandi supportati dal Bot
-Puoi inviare questi messaggi al bot in chat privata per testarlo:
-- `/start` o `/help`: Messaggio di benvenuto e info base.
-- `/status`: Ti conferma che il bot è online ed in esecuzione.

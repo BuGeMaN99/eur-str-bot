@@ -1,12 +1,8 @@
 import os
-import time
 import logging
-import threading
 import requests
 from bs4 import BeautifulSoup
-import telebot
-import schedule
-from dotenv import load_dotenv
+from flask import Flask, render_template_string
 
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,27 +16,9 @@ try:
 except AttributeError:
     pass
 
-# Carica le variabili d'ambiente
-load_dotenv()
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')
-
-if not BOT_TOKEN or not CHANNEL_ID:
-    logger.error("Token del bot o ID del canale mancanti nel file .env")
-    exit(1)
-
-# Crea l'istanza del bot
-bot = telebot.TeleBot(BOT_TOKEN)
+app = Flask(__name__)
 
 URL_ECB = 'https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html'
-
-@bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
-    bot.reply_to(message, "Benvenuto nel bot notifiche Euribor / €STR!\nUsa /status per verificare che il bot sia attivo.")
-
-@bot.message_handler(commands=['status'])
-def send_status(message):
-    bot.reply_to(message, "Bot online e in esecuzione. Le notifiche sono programmate ogni giorno alle 08:01.")
 
 def fetch_estr_data():
     """Recupera l'ultimo tasso €STR dal sito della BCE"""
@@ -73,62 +51,122 @@ def fetch_estr_data():
         logger.error(f"Errore durante il recupero dei dati dalla BCE: {e}")
         return None, None
 
-def send_euribor_notification():
-    """Recupera i dati e invia la notifica al canale"""
-    logger.info("Avvio del recupero dati €STR per la notifica giornaliera...")
+html_template = """
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistiche Valore €STR</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #2980b9;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #95a5a6;
+        }
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        a {
+            color: #2980b9;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Statistiche Tassi €STR</h1>
+        {% if estr_value %}
+            <div class="stat-box">
+                <div class="stat-label">Euro short-term rate (<a href="{{ url }}" target="_blank">€STR</a>)</div>
+                <div class="stat-value">{{ estr_value }}%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Somma con 8,5 punti base (+0.085%)</div>
+                <div class="stat-value">{{ total_value }}%</div>
+            </div>
+            <div class="footer">
+                Ultimo aggiornamento: {{ date }}
+            </div>
+        {% else %}
+            <div class="error">
+                Errore nel recupero dei dati dalla BCE. Riprova più tardi.
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/')
+def index():
+    logger.info("Richiesta ricevuta per la pagina delle statistiche.")
     value_percent, date = fetch_estr_data()
     
     if value_percent is None:
-        logger.error("Recupero dati fallito, nessuna notifica inviata.")
-        return
+        return render_template_string(html_template, estr_value=None)
         
     try:
         estr_value = float(value_percent.replace('%', '').strip())
-        total_value = estr_value + 0.085
-        
-        euribor_link_tag = f'<a href="{URL_ECB}">€STR</a>'
-        message = (
-            f"Euro short-term rate ({euribor_link_tag}): <b>{estr_value:.3f}%</b>\n"
-            f"Somma con 8,5 punti base: <b>{total_value:.3f}%</b>\n"
-            f"Ultimo aggiornamento: {date}"
+        total_value = round(estr_value + 0.085, 3)
+        return render_template_string(
+            html_template,
+            estr_value=f"{estr_value:.3f}",
+            total_value=f"{total_value:.3f}",
+            date=date,
+            url=URL_ECB
         )
-        
-        bot.send_message(CHANNEL_ID, message, parse_mode='HTML')
-        logger.info(f"Notifica inviata con successo al canale {CHANNEL_ID}")
-        
     except ValueError:
         logger.error(f"Errore di conversione sul valore recuperato: {value_percent}")
-    except Exception as e:
-        logger.error(f"Errore durante l'invio del messaggio su Telegram: {e}")
-
-def main():
-    logger.info("Bot in avvio...")
-    
-    # Schedula il job giornaliero
-    schedule.every().day.at("08:01").do(send_euribor_notification)
-    logger.info("Job giornaliero configurato per le 08:01")
-    
-    # Avvia il polling in un thread separato per non bloccare lo scheduler
-    def polling_thread():
-        while True:
-            try:
-                bot.polling(none_stop=True, interval=0, timeout=20)
-            except Exception as e:
-                logger.error(f"Errore nel polling: {e}")
-                time.sleep(15)
-                
-    t = threading.Thread(target=polling_thread)
-    t.daemon = True
-    t.start()
-    logger.info("Bot in ascolto per i comandi (/start, /status, /help)...")
-    
-    # Loop principale per lo scheduler
-    try:
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Chiusura del bot in corso...")
+        return render_template_string(html_template, estr_value=None)
 
 if __name__ == '__main__':
-    main()
+    # Espone la web app su una porta casuale, es. 8345
+    PORT = int(os.environ.get('PORT', 8345))
+    logger.info(f"Avvio del server web sulla porta {PORT}...")
+    app.run(host='0.0.0.0', port=PORT)
