@@ -15,7 +15,7 @@ Mostra i risultati su una dashboard web dal design moderno (chiaro/scuro) che in
 
 1. **Clona la repository**:
    ```bash
-   git clone https://github.com/andreabugetti/eur-str-bot.git
+   git clone git@github.com:andreabugetti/eur-str-bot.git
    cd eur-str-bot
    ```
 
@@ -44,7 +44,7 @@ Questa guida ti presume loggato nel tuo LXC come root:
 1. **Installa il progetto** in una directory stabile (es. `/opt/bots/`):
    ```bash
    cd /opt/bots/
-   git clone https://github.com/andreabugetti/eur-str-bot.git
+   git clone git@github.com:andreabugetti/eur-str-bot.git
    cd eur-str-bot
    python3 -m venv venv
    source venv/bin/activate
