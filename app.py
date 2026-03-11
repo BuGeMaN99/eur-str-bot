@@ -1,8 +1,11 @@
 import os
+import csv
 import logging
+import threading
+import time
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, render_template_string
+from flask import Flask, render_template
 
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -16,9 +19,12 @@ try:
 except AttributeError:
     pass
 
+import schedule
+
 app = Flask(__name__)
 
 URL_ECB = 'https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html'
+CSV_FILE = 'estr_history.csv'
 
 def fetch_estr_data():
     """Recupera l'ultimo tasso €STR dal sito della BCE"""
@@ -51,122 +57,104 @@ def fetch_estr_data():
         logger.error(f"Errore durante il recupero dei dati dalla BCE: {e}")
         return None, None
 
-html_template = """
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Statistiche Valore €STR</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            background-color: #fff;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 500px;
-            width: 100%;
-        }
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-        }
-        .stat-box {
-            background-color: #ecf0f1;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .stat-label {
-            font-size: 14px;
-            color: #7f8c8d;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
-        }
-        .stat-value {
-            font-size: 36px;
-            font-weight: bold;
-            color: #2980b9;
-        }
-        .footer {
-            margin-top: 20px;
-            font-size: 12px;
-            color: #95a5a6;
-        }
-        .error {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-        a {
-            color: #2980b9;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Statistiche Tassi €STR</h1>
-        {% if estr_value %}
-            <div class="stat-box">
-                <div class="stat-label">Euro short-term rate (<a href="{{ url }}" target="_blank">€STR</a>)</div>
-                <div class="stat-value">{{ estr_value }}%</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Somma con 8,5 punti base (+0.085%)</div>
-                <div class="stat-value">{{ total_value }}%</div>
-            </div>
-            <div class="footer">
-                Ultimo aggiornamento: {{ date }}
-            </div>
-        {% else %}
-            <div class="error">
-                Errore nel recupero dei dati dalla BCE. Riprova più tardi.
-            </div>
-        {% endif %}
-    </div>
-</body>
-</html>
-"""
-
-@app.route('/')
-def index():
-    logger.info("Richiesta ricevuta per la pagina delle statistiche.")
+def update_csv_data():
+    """Recupera i dati e li salva nel CSV se non sono già presenti per la data odierna."""
+    logger.info("Tentativo di aggiornamento giornaliero per il CSV...")
     value_percent, date = fetch_estr_data()
-    
     if value_percent is None:
-        return render_template_string(html_template, estr_value=None)
-        
+        logger.error("Fetch fallito, non aggiorno il CSV.")
+        return
+
     try:
         estr_value = float(value_percent.replace('%', '').strip())
         total_value = round(estr_value + 0.085, 3)
-        return render_template_string(
-            html_template,
-            estr_value=f"{estr_value:.3f}",
-            total_value=f"{total_value:.3f}",
-            date=date,
-            url=URL_ECB
-        )
-    except ValueError:
-        logger.error(f"Errore di conversione sul valore recuperato: {value_percent}")
-        return render_template_string(html_template, estr_value=None)
+        
+        # Verifica se il file esiste
+        file_exists = os.path.isfile(CSV_FILE)
+        
+        # Controlla l'ultima data inserita per evitare duplicati
+        last_date = None
+        if file_exists:
+            with open(CSV_FILE, mode='r', newline='', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                if len(rows) > 1:
+                    last_date = rows[-1][0] # La prima colonna è la data
+        
+        if last_date != date:
+            with open(CSV_FILE, mode='a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                if not file_exists or os.stat(CSV_FILE).st_size == 0:
+                    writer.writerow(['Date', 'ESTR_Value', 'Total_Value'])
+                writer.writerow([date, f"{estr_value:.3f}", f"{total_value:.3f}"])
+            logger.info(f"Dati salvati in CSV per la data {date}: €STR {estr_value}%, Totale {total_value}%")
+        else:
+            logger.info(f"Dati per la data {date} già presenti nel CSV. Nessun duplicato inserito.")
+            
+    except Exception as e:
+        logger.error(f"Errore durante l'aggiornamento del CSV: {e}")
+
+def run_schedule():
+    """Esegue lo scheduler in loop in un thread separato."""
+    schedule.every().day.at("08:00").do(update_csv_data)
+    logger.info("Scheduler in background avviato per l'esecuzione giornaliera alle 08:00.")
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+# Avvia lo scraper al bootstrap e poi accende lo scheduler
+# L'if serve a prevenire l'esecuzione multipla del task quando Flask ricarica il server in debug
+if not os.environ.get("WERKZEUG_RUN_MAIN"):
+    update_csv_data()
+    scheduler_thread = threading.Thread(target=run_schedule, daemon=True)
+    scheduler_thread.start()
+
+def read_csv_data():
+    """Legge la storia dal CSV per restituirla al frontend come lista di dicts."""
+    history = []
+    if os.path.isfile(CSV_FILE):
+        with open(CSV_FILE, mode='r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                history.append({
+                    'date': row['Date'],
+                    'estr': float(row['ESTR_Value']),
+                    'total': float(row['Total_Value'])
+                })
+    return history
+
+@app.route('/')
+def index():
+    logger.info("Richiesta ricevuta per la dashboard delle statistiche.")
+    
+    # Nel caso remoto in cui il file CSV sia inesistente prima del mount
+    if not os.path.isfile(CSV_FILE):
+        update_csv_data()
+        
+    history = read_csv_data()
+    
+    current_data = history[-1] if history else None
+    
+    # Calcolo di base delle statistiche
+    min_estr = min([d['estr'] for d in history]) if history else 0
+    max_estr = max([d['estr'] for d in history]) if history else 0
+    avg_estr = (sum([d['estr'] for d in history]) / len(history)) if history else 0
+    
+    stats = {
+        'min': f"{min_estr:.3f}",
+        'max': f"{max_estr:.3f}",
+        'avg': f"{avg_estr:.3f}"
+    }
+    
+    return render_template(
+        'index.html',
+        current_data=current_data,
+        history=history,
+        stats=stats,
+        url=URL_ECB
+    )
 
 if __name__ == '__main__':
-    # Espone la web app su una porta casuale, es. 8345
     PORT = int(os.environ.get('PORT', 8345))
     logger.info(f"Avvio del server web sulla porta {PORT}...")
     app.run(host='0.0.0.0', port=PORT)

@@ -1,10 +1,15 @@
-# Web App Statistiche Euribor / €STR 📊
+# Dashboard Storica Euribor / €STR 📊
 
-Questa applicazione web recupera in tempo reale il tasso **€STR (Euro short-term rate)** dal sito web ufficiale della **BCE (Banca Centrale Europea)**, lo incrementa di 8,5 punti base e mostra i risultati su una pagina web dedicata ed esposta tramite porta.
+Questa applicazione web recupera giornalmente il tasso **€STR (Euro short-term rate)** dal sito web ufficiale della **BCE (Banca Centrale Europea)**, lo incrementa di 8,5 punti base e salva lo storico in un file locale (`estr_history.csv`).
 
-## 🚀 Requisiti
+Mostra i risultati su una dashboard web dal design moderno (chiaro/scuro) che include un grafico interattivo (Chart.js) e le statistiche globali (media, minimo, massimo) aggiornate in tempo reale.
 
-- Python 3.8+
+## 🚀 Funzionalità
+
+- **Scraping Automatico**: Recupera i tassi alle 08:00 di ogni giorno.
+- **Salvataggio Locale**: Memorizza la cronologia dei tassi in un file `estr_history.csv`.
+- **Dashboard Professionale**: Tema Glassmorphism con supporto al tema scuro integrato e animazioni fluide.
+- **Grafico Interattivo**: Chart interattiva costruita con `Chart.js` per visualizzare il trend dei tassi nel tempo.
 
 ## ⚙️ Installazione e Configurazione Rapida (Sviluppo)
 
@@ -25,7 +30,7 @@ Questa applicazione web recupera in tempo reale il tasso **€STR (Euro short-te
    ```bash
    python3 app.py
    ```
-   L'applicazione di default sarà esposta sulla porta `8345`. Puoi specificare una porta diversa passando la variabile d'ambiente `PORT`:
+   L'applicazione, al primo avvio, eseguirà subito il fetch e creerà il file temporale `estr_history.csv`. Sarà esposta di default sulla porta `8345`. Puoi specificare una porta diversa passando la variabile d'ambiente `PORT`:
    ```bash
    PORT=8080 python3 app.py
    ```
@@ -50,7 +55,7 @@ Questa guida ti presume loggato nel tuo LXC come root:
 3. Incolla la seguente configurazione (aggiusta i percorsi `/opt/bots/eur-str-bot` in base a dove hai messo la cartella):
    ```ini
    [Unit]
-   Description=EUR/ESTR Web App
+   Description=EUR/ESTR Web App Dashboard
    After=network.target
 
    [Service]
@@ -75,7 +80,8 @@ Questa guida ti presume loggato nel tuo LXC come root:
    systemctl start eur-str-bot.service
    ```
 
-5. **Controlla i log** in tempo reale per verificare che tutto funzioni:
+5. **Controlla i log** in tempo reale per verificare che tutto funzioni (vedrai anche l'esecuzione del cron job):
    ```bash
    journalctl -u eur-str-bot.service -f
    ```
+
