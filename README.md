@@ -23,11 +23,11 @@ Questa applicazione web recupera in tempo reale il tasso **€STR (Euro short-te
 
 3. **Avvia il server**:
    ```bash
-   python3 tassi_bot.py
+   python3 app.py
    ```
    L'applicazione di default sarà esposta sulla porta `8345`. Puoi specificare una porta diversa passando la variabile d'ambiente `PORT`:
    ```bash
-   PORT=8080 python3 tassi_bot.py
+   PORT=8080 python3 app.py
    ```
 
 ## 🛠️ Suggerimenti per il Deployment su LXC (Proxmox / Linux)
@@ -60,7 +60,7 @@ Questa guida ti presume loggato nel tuo LXC come root:
    # Puoi configurare la porta della UI specificando la variabile d'ambiente PORT (es: 80)
    Environment="PORT=8345"
    # Usa l'eseguibile Python dal virtual environment che hai creato!
-   ExecStart=/opt/eur-str-bot/venv/bin/python /opt/eur-str-bot/tassi_bot.py
+   ExecStart=/opt/eur-str-bot/venv/bin/python /opt/eur-str-bot/app.py
    Restart=always
    RestartSec=10
 
